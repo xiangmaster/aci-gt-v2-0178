@@ -1,0 +1,49 @@
+name: AI Issue Summary
+
+on:
+  issues:
+    types:
+    - opened
+
+permissions:
+  contents: read
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Record deterministic issue triage summary
+      env:
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        ISSUE_AUTHOR_ASSOCIATION: ${{ github.event.issue.author_association }}
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        read -r title_chars body_chars < <(python - <<'PY'
+        import json
+        import os
+
+        with open(os.environ["GITHUB_EVENT_PATH"], "r", encoding="utf-8") as handle:
+            event = json.load(handle)
+        issue = event.get("issue") or {}
+        title = str(issue.get("title") or "")
+        body = str(issue.get("body") or "")
+        print(len(title.encode("utf-8")), len(body.encode("utf-8")))
+        PY
+        )
+
+        {
+          echo "## Deterministic Issue Intake"
+          echo
+          echo "- Issue: #${ISSUE_NUMBER}"
+          echo "- Author association: ${ISSUE_AUTHOR_ASSOCIATION}"
+          echo "- Title characters: ${title_chars}"
+          echo "- Body characters: ${body_chars}"
+          echo "- Public comment written: no"
+          echo "- AI model invoked: no"
+          echo
+          echo "Untrusted issue text is intentionally not sent to an AI model and not mirrored"
+          echo "back into an authenticated repository comment."
+        } >> "$GITHUB_STEP_SUMMARY"
